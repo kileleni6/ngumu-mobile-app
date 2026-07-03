@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { AnalyticsProvider } from "@/providers/AnalyticsProvider";
 import { BlockingProvider } from "@/providers/BlockingProvider";
 import { LicenseProvider } from "@/providers/LicenseProvider";
+import { OnboardingProvider, useOnboarding } from "@/providers/OnboardingProvider";
 import { SettingsProvider } from "@/providers/SettingsProvider";
 import { TimerProvider, useTimer } from "@/providers/TimerProvider";
 import type { TimerPhase } from "@/types";
@@ -30,10 +31,28 @@ function useBreakRouting() {
   }, [phase, hydrated, router]);
 }
 
+/** Routes to onboarding for first-time users, or to the main app otherwise. */
+function useOnboardingRouting() {
+  const { hydrated, completed } = useOnboarding();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!completed) {
+      router.replace("/onboarding");
+    } else {
+      router.replace("/(tabs)");
+    }
+  }, [hydrated, completed, router]);
+}
+
 function RootLayoutNav() {
   useBreakRouting();
+  useOnboardingRouting();
+
   return (
     <Stack screenOptions={{ headerBackTitle: "Back" }}>
+      <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen
         name="break"
@@ -60,7 +79,9 @@ export default function RootLayout() {
             <AnalyticsProvider>
               <BlockingProvider>
                 <TimerProvider>
-                  <RootLayoutNav />
+                  <OnboardingProvider>
+                    <RootLayoutNav />
+                  </OnboardingProvider>
                 </TimerProvider>
               </BlockingProvider>
             </AnalyticsProvider>

@@ -20,12 +20,10 @@ export interface DayStats {
   blockedAttempts: number;
 }
 
-export type PlanId = "weekly" | "monthly" | "lifetime";
-
 export interface LicenseRecord {
-  email: string;
-  plan: PlanId;
+  plan: string;
   activatedAt: number;
+  expirationDate: number | null;
 }
 
 /** trial = full Pro access during free trial, free = trial expired, pro = paid */
@@ -51,3 +49,9 @@ export interface CatalogApp {
 }
 
 export type SiteListMode = "blocklist" | "allowlist";
+
+/** Onboarding completion state persisted to storage. */
+export interface OnboardingState {
+  completed: boolean;
+  skippedAt: number | null;
+}

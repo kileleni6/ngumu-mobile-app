@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import {
@@ -6,7 +7,6 @@ import {
   Crown,
   Eye,
   Lock,
-  Mail,
   RefreshCcw,
   ShieldBan,
   Timer,
@@ -21,7 +21,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -29,20 +28,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
 import { useLicense } from "@/providers/LicenseProvider";
-import type { PlanId } from "@/types";
-
-interface PlanOption {
-  id: PlanId;
-  name: string;
-  detail: string;
-  badge?: string;
-}
-
-const PLANS: PlanOption[] = [
-  { id: "weekly", name: "Weekly", detail: "Flexible — cancel anytime" },
-  { id: "monthly", name: "Monthly", detail: "Most popular balance", badge: "POPULAR" },
-  { id: "lifetime", name: "Lifetime", detail: "Pay once, own it forever", badge: "BEST VALUE" },
-];
+import {
+  fetchOfferings,
+  purchasePackage,
+  type RCPackageInfo,
+} from "@/services/revenuecat";
+import { getJSON, setJSON } from "@/services/storage";
 
 const FEATURES: { icon: React.ReactNode; label: string }[] = [
   { icon: <ShieldBan color={Colors.gold} size={18} />, label: "App & website blocking during focus" },
@@ -50,83 +41,101 @@ const FEATURES: { icon: React.ReactNode; label: string }[] = [
   { icon: <Lock color={Colors.gold} size={18} />, label: "Strict break mode" },
   { icon: <Eye color={Colors.gold} size={18} />, label: "Blink warning customization" },
   { icon: <BarChart3 color={Colors.gold} size={18} />, label: "Advanced analytics & CSV export" },
-  { icon: <RefreshCcw color={Colors.gold} size={18} />, label: "Multi-device restore by email" },
+  { icon: <RefreshCcw color={Colors.gold} size={18} />, label: "Multi-device restore" },
 ];
 
-function isValidEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+/** Maps RevenueCat package types to display metadata. */
+function packageMeta(pkg: RCPackageInfo): { name: string; badge?: string; detail: string } {
+  const type = pkg.packageType;
+  if (type.includes("WEEKLY")) {
+    return { name: "Weekly", detail: "Flexible — cancel anytime" };
+  }
+  if (type.includes("MONTHLY")) {
+    return { name: "Monthly", detail: "Most popular balance", badge: "POPULAR" };
+  }
+  if (type.includes("ANNUAL") || type.includes("YEARLY")) {
+    return { name: "Yearly", detail: "Best yearly value" };
+  }
+  if (type.includes("LIFETIME")) {
+    return { name: "Lifetime", detail: "Pay once, own it forever", badge: "BEST VALUE" };
+  }
+  return { name: pkg.product.title || pkg.identifier, detail: pkg.product.description };
 }
+
+const ONBOARDING_KEY = "ngumu.onboarding.v1";
 
 export default function PaywallScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const license = useLicense();
-  const [selectedPlan, setSelectedPlan] = useState<PlanId>("lifetime");
-  const [email, setEmail] = useState<string>(license.license?.email ?? "");
-  const [busy, setBusy] = useState<"checkout" | "verify" | "restore" | null>(null);
+  const [selectedIdx, setSelectedIdx] = useState<number>(0);
+  const [busy, setBusy] = useState<"purchase" | "restore" | null>(null);
 
-  const onCheckout = async () => {
-    if (!isValidEmail(email)) {
-      Alert.alert("Email needed", "Enter the email you want your license attached to.");
-      return;
-    }
-    setBusy("checkout");
-    try {
-      await license.beginCheckout(selectedPlan, email.trim());
-    } catch (e) {
-      Alert.alert("Checkout unavailable", e instanceof Error ? e.message : "Please try again.");
-    } finally {
-      setBusy(null);
-    }
-  };
+  const offeringsQuery = useQuery({
+    queryKey: ["rc-offerings"],
+    queryFn: fetchOfferings,
+    staleTime: 5 * 60 * 1000,
+  });
 
-  const onVerify = async () => {
-    if (!isValidEmail(email)) {
-      Alert.alert("Email needed", "Enter the email you used at checkout.");
-      return;
-    }
-    setBusy("verify");
+  const packages: RCPackageInfo[] = offeringsQuery.data?.current ?? [];
+  const isLoading = offeringsQuery.isLoading;
+  const isError = offeringsQuery.isError;
+  const isHardPaywall = license.tier === "free";
+  const canDismiss = !isHardPaywall;
+
+  const onPurchase = async () => {
+    if (packages.length === 0) return;
+    setBusy("purchase");
     try {
-      let activated = false;
-      for (let attempt = 0; attempt < 4; attempt++) {
-        activated = await license.checkAndActivate(email.trim());
-        if (activated) break;
-        await new Promise((r) => setTimeout(r, 2500));
-      }
-      if (activated) {
+      const result = await purchasePackage(packages[selectedIdx].raw);
+      if (result.cancelled) {
+        // user dismissed the native sheet — no action needed
+      } else if (result.hasPro) {
+        await license.onPurchaseSuccess();
         Alert.alert("Pro activated", "Welcome to NGUMU Pro. Enjoy your focus!");
         router.back();
       } else {
         Alert.alert(
-          "Not found yet",
-          "We couldn't confirm the payment yet. It can take a minute — try Verify again shortly."
+          "Almost there",
+          "Payment received but entitlement is still syncing. Try Restore in a moment."
         );
       }
-    } catch (e) {
-      Alert.alert("Verification failed", e instanceof Error ? e.message : "Please try again.");
+    } catch {
+      Alert.alert(
+        "Purchase unavailable",
+        "Check your connection and try again. If the problem persists, contact support."
+      );
     } finally {
       setBusy(null);
     }
   };
 
   const onRestore = async () => {
-    if (!isValidEmail(email)) {
-      Alert.alert("Email needed", "Enter the email you purchased with to restore.");
-      return;
-    }
     setBusy("restore");
     try {
-      const ok = await license.checkAndActivate(email.trim());
+      const ok = await license.restorePurchase();
       if (ok) {
-        Alert.alert("Restored", "Your Pro license is active on this device.");
+        Alert.alert("Restored", "Your NGUMU Pro license is active on this device.");
         router.back();
       } else {
-        Alert.alert("No license found", "No active license found for that email.");
+        Alert.alert("No purchases found", "No active NGUMU Pro purchases were found for this account.");
       }
-    } catch (e) {
-      Alert.alert("Restore failed", e instanceof Error ? e.message : "Please try again.");
+    } catch {
+      Alert.alert("Restore failed", "Check your connection and try again.");
     } finally {
       setBusy(null);
+    }
+  };
+
+  const onClose = () => {
+    if (canDismiss) {
+      router.back();
+    } else {
+      Alert.alert(
+        "Trial expired",
+        "Your 40-day trial has ended. The basic timer remains free, but Pro features require a subscription.",
+        [{ text: "View plans", style: "default" }]
+      );
     }
   };
 
@@ -139,15 +148,18 @@ export default function PaywallScreen() {
         <ScrollView
           contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
           <LinearGradient colors={[Colors.maroonDeep, Colors.maroon]} style={styles.hero}>
-            <TouchableOpacity
-              style={[styles.closeButton, { top: insets.top + 8 }]}
-              onPress={() => router.back()}
-              testID="paywall-close"
-            >
-              <X color={Colors.textOnDarkMuted} size={22} />
-            </TouchableOpacity>
+            {canDismiss && (
+              <TouchableOpacity
+                style={[styles.closeButton, { top: insets.top + 8 }]}
+                onPress={onClose}
+                testID="paywall-close"
+              >
+                <X color={Colors.textOnDarkMuted} size={22} />
+              </TouchableOpacity>
+            )}
             <View style={styles.crownWrap}>
               <Crown color={Colors.gold} size={34} />
             </View>
@@ -157,8 +169,14 @@ export default function PaywallScreen() {
                 ? `You have ${license.trialDaysLeft} trial days of full Pro access left`
                 : license.tier === "pro"
                   ? "Pro is active on this device"
-                  : "Your trial ended — the basic timer stays free forever"}
+                  : "Your 40-day trial has ended — the basic timer stays free forever"}
             </Text>
+            {isHardPaywall && (
+              <View style={styles.hardPaywallBadge}>
+                <Lock color={Colors.gold} size={14} />
+                <Text style={styles.hardPaywallText}>Trial expired — unlock Pro to continue</Text>
+              </View>
+            )}
           </LinearGradient>
 
           <View style={styles.body}>
@@ -174,97 +192,105 @@ export default function PaywallScreen() {
             {license.tier !== "pro" && (
               <>
                 <Text style={styles.sectionTitle}>Choose a plan</Text>
-                <View style={styles.plans}>
-                  {PLANS.map((p) => {
-                    const selected = selectedPlan === p.id;
-                    return (
-                      <TouchableOpacity
-                        key={p.id}
-                        style={[styles.planCard, selected && styles.planCardSelected]}
-                        onPress={() => setSelectedPlan(p.id)}
-                        testID={`plan-${p.id}`}
-                      >
-                        <View style={styles.planTextWrap}>
-                          <View style={styles.planNameRow}>
-                            <Text style={[styles.planName, selected && styles.planNameSelected]}>
-                              {p.name}
-                            </Text>
-                            {p.badge && (
-                              <View style={styles.planBadge}>
-                                <Text style={styles.planBadgeText}>{p.badge}</Text>
-                              </View>
-                            )}
+                {isLoading && (
+                  <View style={styles.loadingRow}>
+                    <ActivityIndicator color={Colors.maroon} size="large" />
+                    <Text style={styles.loadingText}>Loading plans...</Text>
+                  </View>
+                )}
+                {isError && !isLoading && (
+                  <View style={styles.errorCard}>
+                    <Text style={styles.errorText}>
+                      Could not load plans. Check your connection and pull down to retry, or tap
+                      Restore if you already purchased.
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.retryButton}
+                      onPress={() => offeringsQuery.refetch()}
+                    >
+                      <Text style={styles.retryText}>Retry</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+                {!isLoading && !isError && packages.length === 0 && (
+                  <View style={styles.errorCard}>
+                    <Text style={styles.errorText}>
+                      No plans available right now. Tap Restore if you already purchased, or try
+                      again later.
+                    </Text>
+                  </View>
+                )}
+                {!isLoading && packages.length > 0 && (
+                  <View style={styles.plans}>
+                    {packages.map((pkg, idx) => {
+                      const meta = packageMeta(pkg);
+                      const selected = selectedIdx === idx;
+                      return (
+                        <TouchableOpacity
+                          key={pkg.identifier}
+                          style={[styles.planCard, selected && styles.planCardSelected]}
+                          onPress={() => setSelectedIdx(idx)}
+                        >
+                          <View style={styles.planTextWrap}>
+                            <View style={styles.planNameRow}>
+                              <Text style={[styles.planName, selected && styles.planNameSelected]}>
+                                {meta.name}
+                              </Text>
+                              {meta.badge && (
+                                <View style={styles.planBadge}>
+                                  <Text style={styles.planBadgeText}>{meta.badge}</Text>
+                                </View>
+                              )}
+                            </View>
+                            <Text style={styles.planDetail}>{meta.detail}</Text>
                           </View>
-                          <Text style={styles.planDetail}>{p.detail}</Text>
-                        </View>
-                        <CheckCircle2
-                          color={selected ? Colors.gold : Colors.border}
-                          size={22}
-                        />
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                          <View style={styles.planRightCol}>
+                            {pkg.priceString ? (
+                              <Text style={[styles.planPrice, selected && styles.planPriceSelected]}>
+                                {pkg.priceString}
+                              </Text>
+                            ) : null}
+                            <CheckCircle2
+                              color={selected ? Colors.gold : Colors.border}
+                              size={22}
+                            />
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
                 <Text style={styles.priceNote}>
-                  Final price is shown on the secure Polar checkout page.
+                  Subscription auto-renews unless cancelled at least 24 hours before the period ends.
+                  Manage in your device&apos;s store settings.
                 </Text>
 
-                <Text style={styles.sectionTitle}>Your email</Text>
-                <View style={styles.emailRow}>
-                  <Mail color={Colors.textSecondary} size={18} />
-                  <TextInput
-                    style={styles.emailInput}
-                    placeholder="you@example.com"
-                    placeholderTextColor={Colors.textSecondary}
-                    autoCapitalize="none"
-                    keyboardType="email-address"
-                    value={email}
-                    onChangeText={setEmail}
-                    testID="email-input"
-                  />
-                </View>
-                <Text style={styles.emailNote}>
-                  Your license is attached to this email — it&apos;s also how you restore Pro on
-                  other devices.
-                </Text>
-
-                {!license.backendConfigured && (
+                {!license.revenueCatConfigured && (
                   <View style={styles.warnCard}>
                     <Text style={styles.warnText}>
-                      Backend not connected yet. Add your Convex deployment URL to enable checkout
-                      and restore.
+                      Payments are not fully configured yet. Restore may still work if you have a
+                      previous purchase.
                     </Text>
                   </View>
                 )}
 
                 <TouchableOpacity
-                  style={[styles.ctaButton, busy !== null && styles.ctaDisabled]}
-                  onPress={onCheckout}
-                  disabled={busy !== null}
+                  style={[styles.ctaButton, busy !== null && styles.ctaDisabled, packages.length === 0 && styles.ctaDisabled]}
+                  onPress={onPurchase}
+                  disabled={busy !== null || packages.length === 0}
                   testID="checkout-button"
                 >
-                  {busy === "checkout" ? (
+                  {busy === "purchase" ? (
                     <ActivityIndicator color={Colors.maroonDeep} />
                   ) : (
-                    <Text style={styles.ctaText}>Continue to secure checkout</Text>
+                    <Text style={styles.ctaText}>
+                      {isHardPaywall ? "Subscribe to unlock" : "Continue"}
+                    </Text>
                   )}
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.secondaryButton, busy !== null && styles.ctaDisabled]}
-                  onPress={onVerify}
-                  disabled={busy !== null}
-                  testID="verify-button"
-                >
-                  {busy === "verify" ? (
-                    <ActivityIndicator color={Colors.maroon} />
-                  ) : (
-                    <Text style={styles.secondaryText}>I already paid — verify</Text>
-                  )}
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.restoreLink}
+                  style={[styles.restoreLink, busy !== null && styles.ctaDisabled]}
                   onPress={onRestore}
                   disabled={busy !== null}
                   testID="restore-button"
@@ -272,7 +298,7 @@ export default function PaywallScreen() {
                   {busy === "restore" ? (
                     <ActivityIndicator color={Colors.textSecondary} size="small" />
                   ) : (
-                    <Text style={styles.restoreText}>Restore purchase by email</Text>
+                    <Text style={styles.restoreText}>Restore purchases</Text>
                   )}
                 </TouchableOpacity>
               </>
@@ -282,7 +308,9 @@ export default function PaywallScreen() {
               <View style={styles.proCard}>
                 <CheckCircle2 color={Colors.success} size={22} />
                 <Text style={styles.proCardText}>
-                  {license.license.plan.toUpperCase()} plan · {license.license.email}
+                  Pro active{license.license.expirationDate
+                    ? ` · renews ${new Date(license.license.expirationDate).toLocaleDateString()}`
+                    : " · lifetime"}
                 </Text>
               </View>
             )}
@@ -321,6 +349,17 @@ const styles = StyleSheet.create({
     marginTop: 6,
     lineHeight: 20,
   },
+  hardPaywallBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(227,168,28,0.15)",
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    marginTop: 12,
+  },
+  hardPaywallText: { color: Colors.gold, fontSize: 12, fontWeight: "700" as const },
   body: { paddingHorizontal: 20, paddingTop: 20 },
   features: { gap: 12, marginBottom: 8 },
   featureRow: { flexDirection: "row", alignItems: "center", gap: 12 },
@@ -334,6 +373,23 @@ const styles = StyleSheet.create({
     marginTop: 22,
     marginBottom: 10,
   },
+  loadingRow: { alignItems: "center", paddingVertical: 28, gap: 12 },
+  loadingText: { color: Colors.textSecondary, fontSize: 14 },
+  errorCard: {
+    backgroundColor: Colors.dangerSoft,
+    borderRadius: 14,
+    padding: 16,
+    gap: 12,
+  },
+  errorText: { color: Colors.danger, fontSize: 13, lineHeight: 18 },
+  retryButton: {
+    alignSelf: "flex-start",
+    backgroundColor: Colors.maroon,
+    borderRadius: 999,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  retryText: { color: Colors.white, fontSize: 14, fontWeight: "700" as const },
   plans: { gap: 10 },
   planCard: {
     flexDirection: "row",
@@ -357,19 +413,10 @@ const styles = StyleSheet.create({
   },
   planBadgeText: { color: Colors.gold, fontSize: 9, fontWeight: "800" as const },
   planDetail: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
-  priceNote: { fontSize: 12, color: Colors.textSecondary, marginTop: 10 },
-  emailRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    backgroundColor: Colors.surface,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: 14,
-  },
-  emailInput: { flex: 1, paddingVertical: 14, fontSize: 15, color: Colors.text },
-  emailNote: { fontSize: 12, color: Colors.textSecondary, marginTop: 8, lineHeight: 17 },
+  planRightCol: { alignItems: "flex-end", gap: 6 },
+  planPrice: { fontSize: 15, fontWeight: "800" as const, color: Colors.text },
+  planPriceSelected: { color: Colors.maroonDeep },
+  priceNote: { fontSize: 11, color: Colors.textSecondary, marginTop: 10, lineHeight: 15 },
   warnCard: {
     backgroundColor: Colors.dangerSoft,
     borderRadius: 12,
@@ -386,15 +433,6 @@ const styles = StyleSheet.create({
   },
   ctaDisabled: { opacity: 0.6 },
   ctaText: { color: Colors.maroonDeep, fontSize: 16, fontWeight: "800" as const },
-  secondaryButton: {
-    borderRadius: 999,
-    paddingVertical: 14,
-    alignItems: "center",
-    marginTop: 10,
-    borderWidth: 1.5,
-    borderColor: Colors.maroon,
-  },
-  secondaryText: { color: Colors.maroon, fontSize: 15, fontWeight: "700" as const },
   restoreLink: { alignItems: "center", paddingVertical: 16 },
   restoreText: {
     color: Colors.textSecondary,

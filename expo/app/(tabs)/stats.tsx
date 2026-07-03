@@ -1,9 +1,10 @@
 import { useRouter } from "expo-router";
-import { Download, Flame, Lock, ShieldBan, SkipForward, Coffee, Trophy } from "lucide-react-native";
+import { Download, Flame, Lock, ShieldBan, SkipForward, Coffee, Trophy, BarChart3 } from "lucide-react-native";
 import React, { useMemo } from "react";
 import { Alert, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import EmptyState from "@/components/EmptyState";
 import TimerRing from "@/components/TimerRing";
 import Colors from "@/constants/colors";
 import { useAnalytics } from "@/providers/AnalyticsProvider";
@@ -14,7 +15,7 @@ import { formatMinutes, weekdayLabel, dayKey } from "@/utils/time";
 export default function StatsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { today, week, streak, focusScore, toCSV } = useAnalytics();
+  const { today, week, streak, focusScore, toCSV, hydrated } = useAnalytics();
   const { settings } = useSettings();
   const { hasPro } = useLicense();
 
@@ -26,6 +27,8 @@ export default function StatsScreen() {
     () => Math.max(30, ...week.map((d) => d.focusMinutes)),
     [week]
   );
+
+  const hasData = hydrated && (today.focusMinutes > 0 || today.sessions > 0 || weekTotal > 0);
 
   const onExport = async () => {
     if (!hasPro) {
@@ -45,96 +48,106 @@ export default function StatsScreen() {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <Text style={styles.screenTitle}>Insights</Text>
 
-        <View style={styles.scoreCard}>
-          <TimerRing
-            size={128}
-            strokeWidth={10}
-            progress={focusScore / 100}
-            color={Colors.gold}
-            trackColor={Colors.maroonLight}
-          >
-            <Text style={styles.scoreValue}>{focusScore}</Text>
-            <Text style={styles.scoreLabel}>score</Text>
-          </TimerRing>
-          <View style={styles.scoreInfo}>
-            <View style={styles.streakRow}>
-              <Flame color={Colors.gold} size={20} />
-              <Text style={styles.streakValue}>{streak} day streak</Text>
-            </View>
-            <Text style={styles.scoreDetail}>
-              {formatMinutes(today.focusMinutes)} of {formatMinutes(settings.dailyGoalMin)} daily
-              goal
-            </Text>
-            <Text style={styles.scoreDetail}>
-              {today.sessions} session{today.sessions === 1 ? "" : "s"} today
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>This week</Text>
-          <Text style={styles.sectionValue}>{formatMinutes(weekTotal)}</Text>
-        </View>
-        <View style={styles.chartCard}>
-          <View style={styles.chart}>
-            {week.map((d) => {
-              const h = Math.max(6, Math.round((d.focusMinutes / maxDay) * 110));
-              const isToday = d.date === dayKey();
-              return (
-                <View key={d.date} style={styles.barCol}>
-                  <Text style={styles.barValue}>
-                    {d.focusMinutes > 0 ? d.focusMinutes : ""}
-                  </Text>
-                  <View
-                    style={[
-                      styles.bar,
-                      { height: h },
-                      isToday ? styles.barToday : undefined,
-                    ]}
-                  />
-                  <Text style={[styles.barLabel, isToday && styles.barLabelToday]}>
-                    {weekdayLabel(d.date)}
-                  </Text>
+        {!hasData ? (
+          <EmptyState
+            icon={<BarChart3 color={Colors.textSecondary} size={32} />}
+            title="No focus data yet"
+            message="Start your first focus session to see your stats, streaks, and focus score here."
+          />
+        ) : (
+          <>
+            <View style={styles.scoreCard}>
+              <TimerRing
+                size={128}
+                strokeWidth={10}
+                progress={focusScore / 100}
+                color={Colors.gold}
+                trackColor={Colors.maroonLight}
+              >
+                <Text style={styles.scoreValue}>{focusScore}</Text>
+                <Text style={styles.scoreLabel}>score</Text>
+              </TimerRing>
+              <View style={styles.scoreInfo}>
+                <View style={styles.streakRow}>
+                  <Flame color={Colors.gold} size={20} />
+                  <Text style={styles.streakValue}>{streak} day streak</Text>
                 </View>
-              );
-            })}
-          </View>
-        </View>
+                <Text style={styles.scoreDetail}>
+                  {formatMinutes(today.focusMinutes)} of {formatMinutes(settings.dailyGoalMin)} daily
+                  goal
+                </Text>
+                <Text style={styles.scoreDetail}>
+                  {today.sessions} session{today.sessions === 1 ? "" : "s"} today
+                </Text>
+              </View>
+            </View>
 
-        <Text style={[styles.sectionTitle, styles.gridTitle]}>Today</Text>
-        <View style={styles.grid}>
-          <View style={styles.gridCard}>
-            <Trophy color={Colors.blue} size={20} />
-            <Text style={styles.gridValue}>{today.sessions}</Text>
-            <Text style={styles.gridLabel}>Sessions</Text>
-          </View>
-          <View style={styles.gridCard}>
-            <Coffee color={Colors.purple} size={20} />
-            <Text style={styles.gridValue}>{today.breaksTaken}</Text>
-            <Text style={styles.gridLabel}>Breaks taken</Text>
-          </View>
-          <View style={styles.gridCard}>
-            <SkipForward color={Colors.goldDeep} size={20} />
-            <Text style={styles.gridValue}>{today.breaksSkipped}</Text>
-            <Text style={styles.gridLabel}>Breaks skipped</Text>
-          </View>
-          <View style={styles.gridCard}>
-            <ShieldBan color={Colors.maroon} size={20} />
-            <Text style={styles.gridValue}>{today.blockedAttempts}</Text>
-            <Text style={styles.gridLabel}>Blocked attempts</Text>
-          </View>
-        </View>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>This week</Text>
+              <Text style={styles.sectionValue}>{formatMinutes(weekTotal)}</Text>
+            </View>
+            <View style={styles.chartCard}>
+              <View style={styles.chart}>
+                {week.map((d) => {
+                  const h = Math.max(6, Math.round((d.focusMinutes / maxDay) * 110));
+                  const isToday = d.date === dayKey();
+                  return (
+                    <View key={d.date} style={styles.barCol}>
+                      <Text style={styles.barValue}>
+                        {d.focusMinutes > 0 ? d.focusMinutes : ""}
+                      </Text>
+                      <View
+                        style={[
+                          styles.bar,
+                          { height: h },
+                          isToday ? styles.barToday : undefined,
+                        ]}
+                      />
+                      <Text style={[styles.barLabel, isToday && styles.barLabelToday]}>
+                        {weekdayLabel(d.date)}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
 
-        <TouchableOpacity style={styles.exportButton} onPress={onExport} testID="export-csv">
-          {hasPro ? (
-            <Download color={Colors.white} size={18} />
-          ) : (
-            <Lock color={Colors.white} size={18} />
-          )}
-          <Text style={styles.exportText}>
-            {hasPro ? "Export CSV report" : "Export CSV report (Pro)"}
-          </Text>
-        </TouchableOpacity>
+            <Text style={[styles.sectionTitle, styles.gridTitle]}>Today</Text>
+            <View style={styles.grid}>
+              <View style={styles.gridCard}>
+                <Trophy color={Colors.blue} size={20} />
+                <Text style={styles.gridValue}>{today.sessions}</Text>
+                <Text style={styles.gridLabel}>Sessions</Text>
+              </View>
+              <View style={styles.gridCard}>
+                <Coffee color={Colors.purple} size={20} />
+                <Text style={styles.gridValue}>{today.breaksTaken}</Text>
+                <Text style={styles.gridLabel}>Breaks taken</Text>
+              </View>
+              <View style={styles.gridCard}>
+                <SkipForward color={Colors.goldDeep} size={20} />
+                <Text style={styles.gridValue}>{today.breaksSkipped}</Text>
+                <Text style={styles.gridLabel}>Breaks skipped</Text>
+              </View>
+              <View style={styles.gridCard}>
+                <ShieldBan color={Colors.maroon} size={20} />
+                <Text style={styles.gridValue}>{today.blockedAttempts}</Text>
+                <Text style={styles.gridLabel}>Blocked attempts</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity style={styles.exportButton} onPress={onExport} testID="export-csv">
+              {hasPro ? (
+                <Download color={Colors.white} size={18} />
+              ) : (
+                <Lock color={Colors.white} size={18} />
+              )}
+              <Text style={styles.exportText}>
+                {hasPro ? "Export CSV report" : "Export CSV report (Pro)"}
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
       </ScrollView>
     </View>
   );
@@ -142,7 +155,7 @@ export default function StatsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  scroll: { paddingHorizontal: 20, paddingBottom: 32 },
+  scroll: { paddingHorizontal: 20, paddingBottom: 120 },
   screenTitle: {
     fontSize: 28,
     fontWeight: "800" as const,

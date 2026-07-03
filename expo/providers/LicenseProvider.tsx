@@ -1,21 +1,21 @@
 import createContextHook from "@nkzw/create-context-hook";
-import * as WebBrowser from "expo-web-browser";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Platform } from "react-native";
 
-import {
-  createPolarCheckout,
-  fetchLicenseStatus,
-  isBackendConfigured,
-} from "@/services/convex";
 import {
   cancelNotifications,
   ensureNotificationSetup,
   notifyNow,
   scheduleAt,
 } from "@/services/notifications";
+import {
+  configureRevenueCat,
+  getCustomerInfo,
+  isRevenueCatConfigured,
+  restorePurchases,
+  type RCPackageInfo,
+} from "@/services/revenuecat";
 import { getJSON, setJSON } from "@/services/storage";
-import type { AccessTier, LicenseRecord, PlanId } from "@/types";
+import type { AccessTier, LicenseRecord } from "@/types";
 
 const TRIAL_DAYS = 40;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -41,6 +41,7 @@ export const [LicenseProvider, useLicense] = createContextHook(() => {
   const [hydrated, setHydrated] = useState<boolean>(false);
   const loadingRef = useRef<boolean>(false);
 
+  // Hydrate from local storage + sync with RevenueCat on first mount.
   useEffect(() => {
     if (loadingRef.current) return;
     loadingRef.current = true;
@@ -60,6 +61,25 @@ export const [LicenseProvider, useLicense] = createContextHook(() => {
       setTrialStartedAt(trial);
       setLicense(lic);
       setHydrated(true);
+
+      // Configure RevenueCat and check for existing entitlements.
+      if (isRevenueCatConfigured()) {
+        await configureRevenueCat(id);
+        try {
+          const info = await getCustomerInfo();
+          if (info.hasPro && !lic) {
+            const record: LicenseRecord = {
+              plan: info.activeSubscriptions[0] ?? "lifetime",
+              activatedAt: Date.now(),
+              expirationDate: info.expirationDate,
+            };
+            setLicense(record);
+            await setJSON(LICENSE_KEY, record);
+          }
+        } catch {
+          // offline or not configured — local state remains source of truth
+        }
+      }
     })();
   }, []);
 
@@ -108,39 +128,34 @@ export const [LicenseProvider, useLicense] = createContextHook(() => {
     await setJSON(LICENSE_KEY, record);
     const pending = await getJSON<string[] | null>(TRIAL_NOTIF_KEY, null);
     if (pending && pending.length > 0) await cancelNotifications(pending);
-    notifyNow("Pro restored", "NGUMU Pro is active on this device. Enjoy!", true);
+    notifyNow("Pro activated", "NGUMU Pro is active on this device. Enjoy!", true);
   }, []);
 
-  /** Opens the Polar hosted checkout created by Convex. */
-  const beginCheckout = useCallback(
-    async (plan: PlanId, email: string): Promise<void> => {
-      const res = await createPolarCheckout({
-        plan,
-        email,
-        deviceId,
-        platform: Platform.OS,
+  /** Restores purchases via RevenueCat — required by App Store review. */
+  const restorePurchase = useCallback(async (): Promise<boolean> => {
+    const info = await restorePurchases();
+    if (info.hasPro) {
+      await activateLicense({
+        plan: info.activeSubscriptions[0] ?? "lifetime",
+        activatedAt: Date.now(),
+        expirationDate: info.expirationDate,
       });
-      await WebBrowser.openBrowserAsync(res.url);
-    },
-    [deviceId]
-  );
+      return true;
+    }
+    return false;
+  }, [activateLicense]);
 
-  /** Single license check by email; activates locally when Convex reports an active license. */
-  const checkAndActivate = useCallback(
-    async (email: string): Promise<boolean> => {
-      const res = await fetchLicenseStatus({ email, deviceId });
-      if (res.active) {
-        await activateLicense({
-          email,
-          plan: res.plan ?? "lifetime",
-          activatedAt: Date.now(),
-        });
-        return true;
-      }
-      return false;
-    },
-    [deviceId, activateLicense]
-  );
+  /** Called after a successful RevenueCat purchase to sync entitlement locally. */
+  const onPurchaseSuccess = useCallback(async (): Promise<void> => {
+    const info = await getCustomerInfo();
+    if (info.hasPro) {
+      await activateLicense({
+        plan: info.activeSubscriptions[0] ?? "lifetime",
+        activatedAt: Date.now(),
+        expirationDate: info.expirationDate,
+      });
+    }
+  }, [activateLicense]);
 
   return useMemo(
     () => ({
@@ -153,9 +168,9 @@ export const [LicenseProvider, useLicense] = createContextHook(() => {
       license,
       tier,
       hasPro,
-      backendConfigured: isBackendConfigured(),
-      beginCheckout,
-      checkAndActivate,
+      revenueCatConfigured: isRevenueCatConfigured(),
+      restorePurchase,
+      onPurchaseSuccess,
     }),
     [
       hydrated,
@@ -166,8 +181,8 @@ export const [LicenseProvider, useLicense] = createContextHook(() => {
       license,
       tier,
       hasPro,
-      beginCheckout,
-      checkAndActivate,
+      restorePurchase,
+      onPurchaseSuccess,
     ]
   );
 });

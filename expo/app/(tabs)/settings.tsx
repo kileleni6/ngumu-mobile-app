@@ -75,6 +75,22 @@ export default function SettingsScreen() {
 
   const goPaywall = () => router.push("/paywall");
 
+  const onRestore = async () => {
+    try {
+      const ok = await license.restorePurchase();
+      if (ok) {
+        Alert.alert("Restored", "Your NGUMU Pro license is active on this device.");
+      } else {
+        Alert.alert("No purchases found", "No active NGUMU Pro purchases were found for this account.");
+      }
+    } catch {
+      Alert.alert(
+        "Restore failed",
+        "Check your internet connection and try again. If the problem persists, contact support with your Support ID."
+      );
+    }
+  };
+
   const onShareSupportId = async () => {
     try {
       await Share.share({
@@ -105,14 +121,16 @@ export default function SettingsScreen() {
             <Text style={styles.accountStatus}>{statusLabel}</Text>
             <Text style={styles.accountSub}>
               {license.tier === "pro"
-                ? license.license?.email ?? ""
+                ? license.license?.expirationDate
+                  ? `Renews ${new Date(license.license.expirationDate).toLocaleDateString()}`
+                  : "Lifetime access"
                 : "Tap to view plans & Pro features"}
             </Text>
           </View>
           <ChevronRight color={Colors.textOnDarkMuted} size={20} />
         </TouchableOpacity>
 
-        <Text style={styles.sectionTitle}>Custom mode (Pro)</Text>
+        <Text style={styles.sectionTitle}>Custom mode</Text>
         <View style={styles.card}>
           <View style={styles.row}>
             <Text style={styles.rowLabel}>Focus length</Text>
@@ -293,10 +311,18 @@ export default function SettingsScreen() {
 
         <Text style={styles.sectionTitle}>Account & support</Text>
         <View style={styles.card}>
-          <TouchableOpacity style={styles.row} onPress={goPaywall} testID="restore-row">
+          <TouchableOpacity style={styles.row} onPress={onRestore} testID="restore-row">
             <View style={styles.rowLabelWrap}>
               <RefreshCcw color={Colors.blue} size={17} />
               <Text style={styles.rowLabel}>Restore purchase</Text>
+            </View>
+            <ChevronRight color={Colors.textSecondary} size={18} />
+          </TouchableOpacity>
+          <View style={styles.divider} />
+          <TouchableOpacity style={styles.row} onPress={goPaywall} testID="manage-sub-row">
+            <View style={styles.rowLabelWrap}>
+              <Crown color={Colors.gold} size={17} />
+              <Text style={styles.rowLabel}>Manage subscription</Text>
             </View>
             <ChevronRight color={Colors.textSecondary} size={18} />
           </TouchableOpacity>
@@ -315,7 +341,7 @@ export default function SettingsScreen() {
 
         <Text style={styles.footerNote}>
           NGUMU: Screen Time Control · Focus better, protect your eyes.{"\n"}
-          Payments are processed securely by Polar — this app never stores payment secrets.
+          Payments are processed securely by RevenueCat via your device&apos;s app store.
         </Text>
       </ScrollView>
     </View>
@@ -324,7 +350,7 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  scroll: { paddingHorizontal: 20, paddingBottom: 32 },
+  scroll: { paddingHorizontal: 20, paddingBottom: 120 },
   screenTitle: {
     fontSize: 28,
     fontWeight: "800" as const,

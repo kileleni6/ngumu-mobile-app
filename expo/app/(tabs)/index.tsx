@@ -191,7 +191,7 @@ export default function DashboardScreen() {
 
         <TouchableOpacity
           style={[styles.blockingCard, blockingActive && styles.blockingCardActive]}
-          onPress={() => router.push("/blocking")}
+          onPress={() => router.push("/(tabs)/blocking")}
           testID="blocking-card"
         >
           <View
@@ -226,7 +226,7 @@ export default function DashboardScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  scrollContent: { paddingBottom: 32 },
+  scrollContent: { paddingBottom: 120 },
   header: {
     flexDirection: "row",
     alignItems: "center",

@@ -11,6 +11,8 @@ import {
 import React, { useMemo, useState } from "react";
 import {
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   Switch,
@@ -23,6 +25,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
 import { APP_CATALOG, SUGGESTED_SITES } from "@/constants/apps";
+import EmptyState from "@/components/EmptyState";
 import { useBlocking } from "@/providers/BlockingProvider";
 import { useLicense } from "@/providers/LicenseProvider";
 
@@ -56,8 +59,16 @@ export default function BlockingScreen() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={insets.top}
+    >
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { paddingTop: insets.top }]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <Text style={styles.screenTitle}>Blocking</Text>
         {!hasPro && (
           <TouchableOpacity style={styles.proBanner} onPress={() => router.push("/paywall")}>
@@ -119,6 +130,13 @@ export default function BlockingScreen() {
               );
             })}
           </View>
+          {blocking.blockedAppIds.length === 0 && (
+            <EmptyState
+              icon={<Smartphone color={Colors.textSecondary} size={28} />}
+              title="No apps blocked yet"
+              message="Tap apps above to add them to your blocklist. They'll be shielded during focus sessions."
+            />
+          )}
         </View>
 
         <View style={styles.sectionCard}>
@@ -211,6 +229,13 @@ export default function BlockingScreen() {
               ))}
             </View>
           )}
+          {blocking.sites.length === 0 && (
+            <EmptyState
+              icon={<Globe color={Colors.textSecondary} size={28} />}
+              title="No websites blocked yet"
+              message="Add domains above or tap a suggestion to start your blocklist."
+            />
+          )}
         </View>
 
         <View style={styles.infoCard}>
@@ -236,13 +261,13 @@ export default function BlockingScreen() {
           </Text>
         </View>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  scroll: { paddingHorizontal: 20, paddingBottom: 32 },
+  scroll: { paddingHorizontal: 20, paddingBottom: 120 },
   screenTitle: {
     fontSize: 28,
     fontWeight: "800" as const,
