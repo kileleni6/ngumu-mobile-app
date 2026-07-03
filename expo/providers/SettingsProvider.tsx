@@ -19,6 +19,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   customFocusMin: 45,
   customBreakMin: 10,
   dailyGoalMin: 120,
+  customEyeHealth: false,
 };
 
 export const [SettingsProvider, useSettings] = createContextHook(() => {

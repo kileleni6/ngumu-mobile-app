@@ -4,11 +4,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getJSON, setJSON } from "@/services/storage";
 import type { OnboardingState } from "@/types";
 
-const ONBOARDING_KEY = "ngumu.onboarding.v1";
+const ONBOARDING_KEY = "ngumu.onboarding.v2";
 
 const DEFAULT_STATE: OnboardingState = {
   completed: false,
   skippedAt: null,
+  selectedModeId: null,
+  inviteCode: null,
+  trialExtendedDays: 0,
+  notificationsGranted: false,
 };
 
 export const [OnboardingProvider, useOnboarding] = createContextHook(() => {
@@ -26,22 +30,61 @@ export const [OnboardingProvider, useOnboarding] = createContextHook(() => {
     })();
   }, []);
 
-  const complete = useCallback(() => {
-    const next: OnboardingState = { completed: true, skippedAt: null };
+  const persist = useCallback((next: OnboardingState) => {
     setState(next);
     setJSON(ONBOARDING_KEY, next);
   }, []);
 
+  const complete = useCallback(() => {
+    persist({ ...state, completed: true, skippedAt: null });
+  }, [state, persist]);
+
   const skip = useCallback(() => {
-    const next: OnboardingState = { completed: true, skippedAt: Date.now() };
-    setState(next);
-    setJSON(ONBOARDING_KEY, next);
-  }, []);
+    persist({ ...state, completed: true, skippedAt: Date.now() });
+  }, [state, persist]);
 
   const reset = useCallback(() => {
     setState(DEFAULT_STATE);
     setJSON(ONBOARDING_KEY, DEFAULT_STATE);
   }, []);
 
-  return { hydrated, completed: state.completed, skippedAt: state.skippedAt, complete, skip, reset };
+  const setSelectedModeId = useCallback(
+    (modeId: string) => {
+      const next = { ...state, selectedModeId: modeId };
+      persist(next);
+    },
+    [state, persist]
+  );
+
+  const setInviteCode = useCallback(
+    (code: string, extraDays: number) => {
+      const next = { ...state, inviteCode: code, trialExtendedDays: extraDays };
+      persist(next);
+    },
+    [state, persist]
+  );
+
+  const setNotificationsGranted = useCallback(
+    (granted: boolean) => {
+      const next = { ...state, notificationsGranted: granted };
+      persist(next);
+    },
+    [state, persist]
+  );
+
+  return {
+    hydrated,
+    completed: state.completed,
+    skippedAt: state.skippedAt,
+    selectedModeId: state.selectedModeId,
+    inviteCode: state.inviteCode,
+    trialExtendedDays: state.trialExtendedDays,
+    notificationsGranted: state.notificationsGranted,
+    complete,
+    skip,
+    reset,
+    setSelectedModeId,
+    setInviteCode,
+    setNotificationsGranted,
+  };
 });

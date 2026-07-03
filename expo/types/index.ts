@@ -40,6 +40,8 @@ export interface AppSettings {
   customFocusMin: number;
   customBreakMin: number;
   dailyGoalMin: number;
+  /** When true, the custom mode inserts a 20-second eye break every 20 minutes. */
+  customEyeHealth: boolean;
 }
 
 export interface CatalogApp {
@@ -50,8 +52,22 @@ export interface CatalogApp {
 
 export type SiteListMode = "blocklist" | "allowlist";
 
+/** Permission states tracked during onboarding and runtime. */
+export type PermissionState = "pending" | "granted" | "denied";
+
+/** Invite code validation result from Convex (or local offline fallback). */
+export interface InviteCodeResult {
+  valid: boolean;
+  extraDays: number;
+  message: string;
+}
+
 /** Onboarding completion state persisted to storage. */
 export interface OnboardingState {
   completed: boolean;
   skippedAt: number | null;
+  selectedModeId: string | null;
+  inviteCode: string | null;
+  trialExtendedDays: number;
+  notificationsGranted: boolean;
 }

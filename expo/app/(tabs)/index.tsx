@@ -1,10 +1,11 @@
 import { useRouter } from "expo-router";
 import { Crown, Eye, Pause, Play, RotateCcw, ShieldBan, ShieldCheck, Zap } from "lucide-react-native";
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import BlinkOverlay from "@/components/BlinkOverlay";
+import CustomModeSheet from "@/components/CustomModeSheet";
 import TimerRing from "@/components/TimerRing";
 import Colors from "@/constants/colors";
 import { MODES } from "@/constants/modes";
@@ -21,6 +22,7 @@ export default function DashboardScreen() {
   const { today } = useAnalytics();
   const license = useLicense();
   const blocking = useBlocking();
+  const [customSheetVisible, setCustomSheetVisible] = useState<boolean>(false);
 
   const phaseLabel = useMemo(() => {
     if (timer.phase === "focus") return timer.running ? "Focusing" : "Paused";
@@ -126,6 +128,14 @@ export default function DashboardScreen() {
                 ]}
                 onPress={() => {
                   if (disabled) return;
+                  if (m.id === "custom") {
+                    if (locked) {
+                      router.push("/paywall");
+                      return;
+                    }
+                    setCustomSheetVisible(true);
+                    return;
+                  }
                   if (locked) {
                     router.push("/paywall");
                     return;
@@ -220,6 +230,11 @@ export default function DashboardScreen() {
       </ScrollView>
 
       <BlinkOverlay visible={timer.blinkImminent} blinks={2} />
+
+      <CustomModeSheet
+        visible={customSheetVisible}
+        onClose={() => setCustomSheetVisible(false)}
+      />
     </View>
   );
 }
