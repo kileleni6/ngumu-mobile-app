@@ -62,10 +62,7 @@ export function resolveMode(id: string, settings: AppSettings): FocusModeDef {
       ...base,
       focusSec: Math.max(1, settings.customFocusMin) * 60,
       breakSec: Math.max(1, settings.customBreakMin) * 60,
-      eyeHealth: settings.customEyeHealth,
-      tagline: settings.customEyeHealth
-        ? `${settings.customFocusMin} min focus · ${settings.customBreakMin} min break · 20-20-20`
-        : `${settings.customFocusMin} min focus · ${settings.customBreakMin} min break`,
+      tagline: `${settings.customFocusMin} min focus · ${settings.customBreakMin} min break`,
     };
   }
   return base;

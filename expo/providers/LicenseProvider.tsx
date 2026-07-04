@@ -14,17 +14,14 @@ import {
   restorePurchases,
   type RCPackageInfo,
 } from "@/services/revenuecat";
-import { isBackendConfigured, safePost } from "@/services/convex";
 import { getJSON, setJSON } from "@/services/storage";
-import type { AccessTier, InviteCodeResult, LicenseRecord } from "@/types";
+import type { AccessTier, LicenseRecord } from "@/types";
 
 const TRIAL_DAYS = 40;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const DEVICE_ID_KEY = "ngumu.deviceId.v1";
 const TRIAL_KEY = "ngumu.trialStartedAt.v1";
-const TRIAL_EXT_KEY = "ngumu.trialExtraDays.v1";
-const CLAIMED_CODE_KEY = "ngumu.claimedInviteCode.v1";
 const LICENSE_KEY = "ngumu.license.v1";
 const TRIAL_NOTIF_KEY = "ngumu.trialNotifIds.v1";
 
@@ -40,8 +37,6 @@ function generateDeviceId(): string {
 export const [LicenseProvider, useLicense] = createContextHook(() => {
   const [deviceId, setDeviceId] = useState<string>("");
   const [trialStartedAt, setTrialStartedAt] = useState<number>(0);
-  const [extraTrialDays, setExtraTrialDays] = useState<number>(0);
-  const [claimedCode, setClaimedCode] = useState<string | null>(null);
   const [license, setLicense] = useState<LicenseRecord | null>(null);
   const [hydrated, setHydrated] = useState<boolean>(false);
   const loadingRef = useRef<boolean>(false);
@@ -62,12 +57,8 @@ export const [LicenseProvider, useLicense] = createContextHook(() => {
         await setJSON(TRIAL_KEY, trial);
       }
       const lic = await getJSON<LicenseRecord | null>(LICENSE_KEY, null);
-      const extra = await getJSON<number>(TRIAL_EXT_KEY, 0);
-      const code = await getJSON<string | null>(CLAIMED_CODE_KEY, null);
       setDeviceId(id);
       setTrialStartedAt(trial);
-      setExtraTrialDays(extra);
-      setClaimedCode(code);
       setLicense(lic);
       setHydrated(true);
 
@@ -92,8 +83,7 @@ export const [LicenseProvider, useLicense] = createContextHook(() => {
     })();
   }, []);
 
-  const trialDaysTotal = TRIAL_DAYS + extraTrialDays;
-  const trialEndsAt = trialStartedAt + trialDaysTotal * DAY_MS;
+  const trialEndsAt = trialStartedAt + TRIAL_DAYS * DAY_MS;
   const trialDaysLeft = hydrated
     ? Math.max(0, Math.ceil((trialEndsAt - Date.now()) / DAY_MS))
     : TRIAL_DAYS;
@@ -141,54 +131,6 @@ export const [LicenseProvider, useLicense] = createContextHook(() => {
     notifyNow("Pro activated", "NGUMU Pro is active on this device. Enjoy!", true);
   }, []);
 
-  /**
-   * Claims an invite code to extend the trial. Tries Convex first, falls back
-   * to a local offline check for known demo codes so the flow never breaks.
-   */
-  const claimInviteCode = useCallback(
-    async (code: string): Promise<InviteCodeResult> => {
-      const trimmed = code.trim().toUpperCase();
-      if (trimmed.length < 4) {
-        return { valid: false, extraDays: 0, message: "Code must be at least 4 characters." };
-      }
-      if (claimedCode === trimmed) {
-        return { valid: false, extraDays: 0, message: "This code has already been claimed on this device." };
-      }
-
-      // Try Convex backend.
-      if (isBackendConfigured()) {
-        const res = await safePost<InviteCodeResult>("/claimInviteCode", {
-          deviceId,
-          code: trimmed,
-        });
-        if (res) {
-          if (res.valid && res.extraDays > 0) {
-            const next = extraTrialDays + res.extraDays;
-            setExtraTrialDays(next);
-            setClaimedCode(trimmed);
-            await setJSON(TRIAL_EXT_KEY, next);
-            await setJSON(CLAIMED_CODE_KEY, trimmed);
-          }
-          return res;
-        }
-      }
-
-      // Offline / no-backend fallback: accept NGUMU- prefixed demo codes.
-      if (trimmed.startsWith("NGUMU-")) {
-        const extra = 14;
-        const next = extraTrialDays + extra;
-        setExtraTrialDays(next);
-        setClaimedCode(trimmed);
-        await setJSON(TRIAL_EXT_KEY, next);
-        await setJSON(CLAIMED_CODE_KEY, trimmed);
-        return { valid: true, extraDays: extra, message: `+${extra} days added to your trial!` };
-      }
-
-      return { valid: false, extraDays: 0, message: "Could not verify code. Check your connection and try again." };
-    },
-    [deviceId, claimedCode, extraTrialDays]
-  );
-
   /** Restores purchases via RevenueCat — required by App Store review. */
   const restorePurchase = useCallback(async (): Promise<boolean> => {
     const info = await restorePurchases();
@@ -222,14 +164,11 @@ export const [LicenseProvider, useLicense] = createContextHook(() => {
       trialStartedAt,
       trialEndsAt,
       trialDaysLeft,
-      trialDaysTotal,
-      extraTrialDays,
-      claimedCode,
+      trialDaysTotal: TRIAL_DAYS,
       license,
       tier,
       hasPro,
       revenueCatConfigured: isRevenueCatConfigured(),
-      claimInviteCode,
       restorePurchase,
       onPurchaseSuccess,
     }),
@@ -239,13 +178,9 @@ export const [LicenseProvider, useLicense] = createContextHook(() => {
       trialStartedAt,
       trialEndsAt,
       trialDaysLeft,
-      trialDaysTotal,
-      extraTrialDays,
-      claimedCode,
       license,
       tier,
       hasPro,
-      claimInviteCode,
       restorePurchase,
       onPurchaseSuccess,
     ]
