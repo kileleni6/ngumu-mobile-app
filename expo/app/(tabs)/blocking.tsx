@@ -65,7 +65,7 @@ export default function BlockingScreen() {
       keyboardVerticalOffset={insets.top}
     >
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingTop: insets.top }]}
+        contentContainerStyle={[styles.scroll, { paddingTop: insets.top, paddingBottom: insets.bottom + 140 }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -267,7 +267,7 @@ export default function BlockingScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  scroll: { paddingHorizontal: 20, paddingBottom: 120 },
+  scroll: { paddingHorizontal: 20, paddingBottom: 140 },
   screenTitle: {
     fontSize: 28,
     fontWeight: "800" as const,

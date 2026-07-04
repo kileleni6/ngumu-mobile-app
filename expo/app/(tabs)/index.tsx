@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router";
 import { Crown, Eye, Pause, Play, RotateCcw, ShieldBan, ShieldCheck, Zap } from "lucide-react-native";
 import React, { useMemo, useState } from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import BlinkOverlay from "@/components/BlinkOverlay";
@@ -14,6 +14,9 @@ import { useBlocking } from "@/providers/BlockingProvider";
 import { useLicense } from "@/providers/LicenseProvider";
 import { useTimer } from "@/providers/TimerProvider";
 import { formatClock, formatMinutes } from "@/utils/time";
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const RING_SIZE = Math.min(260, SCREEN_WIDTH - 64);
 
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
@@ -59,7 +62,10 @@ export default function DashboardScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: insets.bottom + 140 },
+        ]}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
@@ -85,8 +91,8 @@ export default function DashboardScreen() {
 
         <View style={styles.timerSection}>
           <TimerRing
-            size={264}
-            strokeWidth={14}
+            size={RING_SIZE}
+            strokeWidth={12}
             progress={timer.phase === "idle" ? 0 : timer.progress}
             color={timer.phase === "break" ? Colors.gold : timer.mode.accent}
           >
@@ -241,7 +247,7 @@ export default function DashboardScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  scrollContent: { paddingBottom: 120 },
+  scrollContent: { paddingBottom: 140 },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -277,7 +283,7 @@ const styles = StyleSheet.create({
   trialPillPro: { backgroundColor: Colors.gold },
   trialPillText: { color: Colors.goldSoft, fontSize: 12, fontWeight: "700" as const },
   trialPillTextPro: { color: Colors.maroonDeep },
-  timerSection: { alignItems: "center", marginTop: 20 },
+  timerSection: { alignItems: "center", marginTop: 16 },
   phaseLabel: {
     fontSize: 13,
     fontWeight: "600" as const,
@@ -286,7 +292,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
   },
   clock: {
-    fontSize: 58,
+    fontSize: 54,
     fontWeight: "800" as const,
     color: Colors.text,
     fontVariant: ["tabular-nums"],
@@ -302,7 +308,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   modeBadgeText: { fontSize: 12, fontWeight: "700" as const },
-  modesScroll: { marginTop: 24 },
+  modesScroll: { marginTop: 22 },
   modesRow: { paddingHorizontal: 20, gap: 10 },
   modeChip: {
     backgroundColor: Colors.surface,
@@ -323,7 +329,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 20,
-    marginTop: 26,
+    marginTop: 24,
     paddingHorizontal: 20,
   },
   primaryButton: {
@@ -351,7 +357,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  cardsRow: { flexDirection: "row", gap: 12, paddingHorizontal: 20, marginTop: 26 },
+  cardsRow: { flexDirection: "row", gap: 12, paddingHorizontal: 20, marginTop: 24 },
   statCard: {
     flex: 1,
     backgroundColor: Colors.surface,

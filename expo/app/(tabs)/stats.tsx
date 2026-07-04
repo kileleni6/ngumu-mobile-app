@@ -45,7 +45,7 @@ export default function StatsScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 140 }]} showsVerticalScrollIndicator={false}>
         <Text style={styles.screenTitle}>Insights</Text>
 
         {!hasData ? (
@@ -155,7 +155,7 @@ export default function StatsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  scroll: { paddingHorizontal: 20, paddingBottom: 120 },
+  scroll: { paddingHorizontal: 20, paddingBottom: 140 },
   screenTitle: {
     fontSize: 28,
     fontWeight: "800" as const,

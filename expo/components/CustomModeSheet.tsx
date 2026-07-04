@@ -23,8 +23,8 @@ import { useTimer } from "@/providers/TimerProvider";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
-const FOCUS_VALUES = Array.from({ length: 36 }, (_, i) => (i + 5) * 5); // 5–180 step 5
-const BREAK_VALUES = Array.from({ length: 60 }, (_, i) => i + 1); // 1–60 step 1
+const FOCUS_VALUES = Array.from({ length: 200 }, (_, i) => i + 1); // 1–200 min
+const BREAK_VALUES = Array.from({ length: 120 }, (_, i) => i + 1); // 1–120 min
 
 interface CustomModeSheetProps {
   visible: boolean;
@@ -43,8 +43,8 @@ export default function CustomModeSheet({ visible, onClose }: CustomModeSheetPro
   const timer = useTimer();
 
   const [tab, setTab] = useState<"presets" | "custom">("custom");
-  const [focusMin, setFocusMin] = useState<number>(settings.customFocusMin);
-  const [breakMin, setBreakMin] = useState<number>(settings.customBreakMin);
+  const [focusMin, setFocusMin] = useState<number>(Math.min(Math.max(settings.customFocusMin, 1), 200));
+  const [breakMin, setBreakMin] = useState<number>(Math.min(Math.max(settings.customBreakMin, 1), 120));
   const [eyeHealth, setEyeHealth] = useState<boolean>(settings.customEyeHealth);
 
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
@@ -53,8 +53,8 @@ export default function CustomModeSheet({ visible, onClose }: CustomModeSheetPro
   // Sync local state when sheet opens.
   useEffect(() => {
     if (visible) {
-      setFocusMin(settings.customFocusMin);
-      setBreakMin(settings.customBreakMin);
+      setFocusMin(Math.min(Math.max(settings.customFocusMin, 1), 200));
+      setBreakMin(Math.min(Math.max(settings.customBreakMin, 1), 120));
       setEyeHealth(settings.customEyeHealth);
       setTab("custom");
       Animated.parallel([
@@ -100,7 +100,9 @@ export default function CustomModeSheet({ visible, onClose }: CustomModeSheetPro
 
   const handleSaveAndStart = useCallback(() => {
     if (locked) return;
-    update({ customFocusMin: focusMin, customBreakMin: breakMin, customEyeHealth: eyeHealth });
+    const nextFocus = Math.min(Math.max(focusMin, 1), 200);
+    const nextBreak = Math.min(Math.max(breakMin, 1), 120);
+    update({ customFocusMin: nextFocus, customBreakMin: nextBreak, customEyeHealth: eyeHealth });
     // Select custom mode and start focus after a brief delay for settings to propagate.
     setTimeout(() => {
       timer.setModeId("custom");
@@ -356,6 +358,36 @@ const styles = StyleSheet.create({
   presetsScroll: {
     paddingHorizontal: 24,
     maxHeight: 240,
+  },
+  presetsList: {
+    gap: 10,
+  },
+  presetRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "space-between" as const,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  presetRowName: {
+    fontSize: 15,
+    fontWeight: "700" as const,
+    color: Colors.text,
+  },
+  presetRowTagline: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  presetRowBadge: {
+    fontSize: 11,
+    fontWeight: "700" as const,
+    color: Colors.maroon,
+    backgroundColor: Colors.maroonSoft,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
   },
   presetsHint: {
     fontSize: 15,

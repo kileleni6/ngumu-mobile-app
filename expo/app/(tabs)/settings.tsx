@@ -125,7 +125,7 @@ export default function SettingsScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 140 }]} showsVerticalScrollIndicator={false}>
         <Text style={styles.screenTitle}>{t("settings.title")}</Text>
 
         <TouchableOpacity style={styles.accountCard} onPress={goPaywall} testID="account-card">
@@ -151,9 +151,9 @@ export default function SettingsScreen() {
             <Text style={styles.rowLabel}>{t("settings.focusLength")}</Text>
             <Stepper
               value={settings.customFocusMin}
-              min={5}
-              max={180}
-              step={5}
+              min={1}
+              max={200}
+              step={1}
               unit="m"
               locked={!license.hasPro}
               onChange={(v) => update({ customFocusMin: v })}
@@ -167,7 +167,7 @@ export default function SettingsScreen() {
             <Stepper
               value={settings.customBreakMin}
               min={1}
-              max={60}
+              max={120}
               step={1}
               unit="m"
               locked={!license.hasPro}
@@ -378,7 +378,7 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  scroll: { paddingHorizontal: 20, paddingBottom: 120 },
+  scroll: { paddingHorizontal: 20, paddingBottom: 140 },
   screenTitle: {
     fontSize: 28,
     fontWeight: "800" as const,
