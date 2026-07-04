@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Crown,
   Eye,
+  Globe,
   Lock,
   Minus,
   Plus,
@@ -28,6 +29,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
+import { LANGUAGE_META, t } from "@/i18n";
+import { useLanguage } from "@/providers/LanguageProvider";
 import { useLicense } from "@/providers/LicenseProvider";
 import { useSettings } from "@/providers/SettingsProvider";
 
@@ -72,6 +75,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { settings, update } = useSettings();
   const license = useLicense();
+  const { code: languageCode, setCode: setLanguageCode } = useLanguage();
 
   const goPaywall = () => router.push("/paywall");
 
@@ -79,39 +83,50 @@ export default function SettingsScreen() {
     try {
       const ok = await license.restorePurchase();
       if (ok) {
-        Alert.alert("Restored", "Your NGUMU Pro license is active on this device.");
+        Alert.alert(t("paywall.restored"), t("paywall.restoredBody"));
       } else {
-        Alert.alert("No purchases found", "No active NGUMU Pro purchases were found for this account.");
+        Alert.alert(t("paywall.noPurchases"), t("paywall.noPurchasesBody"));
       }
     } catch {
-      Alert.alert(
-        "Restore failed",
-        "Check your internet connection and try again. If the problem persists, contact support with your Support ID."
-      );
+      Alert.alert(t("paywall.restoreFailed"), t("paywall.restoreFailedBody"));
     }
   };
 
   const onShareSupportId = async () => {
     try {
       await Share.share({
-        message: `NGUMU support ID: ${license.deviceId}`,
+        message: `${t("settings.deviceId")}: ${license.deviceId}`,
       });
     } catch (e) {
-      Alert.alert("Could not share", e instanceof Error ? e.message : "Please try again.");
+      Alert.alert(t("errors.generic"), e instanceof Error ? e.message : "Please try again.");
     }
+  };
+
+  const showLanguagePicker = () => {
+    Alert.alert(
+      t("settings.language"),
+      "",
+      [
+        ...LANGUAGE_META.map((lang) => ({
+          text: `${lang.flag} ${lang.name}`,
+          onPress: () => setLanguageCode(lang.code),
+        })),
+        { text: t("common.cancel"), style: "cancel" as const },
+      ]
+    );
   };
 
   const statusLabel =
     license.tier === "pro"
-      ? `Pro · ${license.license?.plan ?? ""}`
+      ? `${t("common.pro")} · ${license.license?.plan ?? ""}`
       : license.tier === "trial"
-        ? `Trial · ${license.trialDaysLeft} of ${license.trialDaysTotal} days left`
-        : "Free plan (trial ended)";
+        ? t("settings.trialDaysLeft", { count: license.trialDaysLeft, total: license.trialDaysTotal })
+        : t("dashboard.freePlan");
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <Text style={styles.screenTitle}>Settings</Text>
+        <Text style={styles.screenTitle}>{t("settings.title")}</Text>
 
         <TouchableOpacity style={styles.accountCard} onPress={goPaywall} testID="account-card">
           <View style={styles.accountIcon}>
@@ -122,18 +137,18 @@ export default function SettingsScreen() {
             <Text style={styles.accountSub}>
               {license.tier === "pro"
                 ? license.license?.expirationDate
-                  ? `Renews ${new Date(license.license.expirationDate).toLocaleDateString()}`
-                  : "Lifetime access"
-                : "Tap to view plans & Pro features"}
+                  ? `${t("paywall.renews")} ${new Date(license.license.expirationDate).toLocaleDateString()}`
+                  : t("paywall.lifetimeDetail")
+                : t("paywall.viewPlans")}
             </Text>
           </View>
           <ChevronRight color={Colors.textOnDarkMuted} size={20} />
         </TouchableOpacity>
 
-        <Text style={styles.sectionTitle}>Custom mode</Text>
+        <Text style={styles.sectionTitle}>{t("settings.customMode")}</Text>
         <View style={styles.card}>
           <View style={styles.row}>
-            <Text style={styles.rowLabel}>Focus length</Text>
+            <Text style={styles.rowLabel}>{t("settings.focusLength")}</Text>
             <Stepper
               value={settings.customFocusMin}
               min={5}
@@ -148,7 +163,7 @@ export default function SettingsScreen() {
           </View>
           <View style={styles.divider} />
           <View style={styles.row}>
-            <Text style={styles.rowLabel}>Break length</Text>
+            <Text style={styles.rowLabel}>{t("settings.breakLength")}</Text>
             <Stepper
               value={settings.customBreakMin}
               min={1}
@@ -165,7 +180,7 @@ export default function SettingsScreen() {
           <View style={styles.row}>
             <View style={styles.rowLabelWrap}>
               <Target color={Colors.blue} size={17} />
-              <Text style={styles.rowLabel}>Daily focus goal</Text>
+              <Text style={styles.rowLabel}>{t("settings.dailyGoal")}</Text>
             </View>
             <Stepper
               value={settings.dailyGoalMin}
@@ -181,12 +196,12 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Breaks & eye health</Text>
+        <Text style={styles.sectionTitle}>{t("settings.break")} & {t("settings.eyeHealth")}</Text>
         <View style={styles.card}>
           <View style={styles.row}>
             <View style={styles.rowLabelWrap}>
               <Eye color={Colors.goldDeep} size={17} />
-              <Text style={styles.rowLabel}>Blink warning before break</Text>
+              <Text style={styles.rowLabel}>{t("settings.blink")}</Text>
             </View>
             <Switch
               value={settings.blinkWarningEnabled}
@@ -198,7 +213,7 @@ export default function SettingsScreen() {
           </View>
           <View style={styles.divider} />
           <View style={styles.row}>
-            <Text style={styles.rowLabel}>Blink warning duration</Text>
+            <Text style={styles.rowLabel}>{t("settings.blinkDuration", { seconds: settings.blinkSeconds })}</Text>
             <View style={styles.segment}>
               {([3, 5] as const).map((sec) => (
                 <TouchableOpacity
@@ -232,7 +247,7 @@ export default function SettingsScreen() {
           <View style={styles.row}>
             <View style={styles.rowLabelWrap}>
               <Lock color={Colors.purple} size={17} />
-              <Text style={styles.rowLabel}>Strict break mode (Pro)</Text>
+              <Text style={styles.rowLabel}>{t("settings.strictBreaks")}</Text>
             </View>
             <Switch
               value={settings.strictBreaks && license.hasPro}
@@ -250,12 +265,12 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Notifications & feedback</Text>
+        <Text style={styles.sectionTitle}>{t("settings.notifications")}</Text>
         <View style={styles.card}>
           <View style={styles.row}>
             <View style={styles.rowLabelWrap}>
               <Bell color={Colors.maroon} size={17} />
-              <Text style={styles.rowLabel}>Session notifications</Text>
+              <Text style={styles.rowLabel}>{t("settings.notifications")}</Text>
             </View>
             <Switch
               value={settings.notificationsEnabled}
@@ -269,7 +284,7 @@ export default function SettingsScreen() {
           <View style={styles.row}>
             <View style={styles.rowLabelWrap}>
               <BellRing color={Colors.blue} size={17} />
-              <Text style={styles.rowLabel}>Daily focus reminder (9:00)</Text>
+              <Text style={styles.rowLabel}>{t("settings.dailyReminder")} (9:00)</Text>
             </View>
             <Switch
               value={settings.dailyReminderEnabled}
@@ -283,7 +298,7 @@ export default function SettingsScreen() {
           <View style={styles.row}>
             <View style={styles.rowLabelWrap}>
               <Volume2 color={Colors.goldDeep} size={17} />
-              <Text style={styles.rowLabel}>Sound</Text>
+              <Text style={styles.rowLabel}>{t("settings.sound")}</Text>
             </View>
             <Switch
               value={settings.soundEnabled}
@@ -297,7 +312,7 @@ export default function SettingsScreen() {
           <View style={styles.row}>
             <View style={styles.rowLabelWrap}>
               <Vibrate color={Colors.purple} size={17} />
-              <Text style={styles.rowLabel}>Vibration</Text>
+              <Text style={styles.rowLabel}>{t("settings.vibration")}</Text>
             </View>
             <Switch
               value={settings.vibrationEnabled}
@@ -309,12 +324,25 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Account & support</Text>
+        <Text style={styles.sectionTitle}>{t("settings.trialStatus")}</Text>
         <View style={styles.card}>
+          <TouchableOpacity style={styles.row} onPress={showLanguagePicker} testID="language-row">
+            <View style={styles.rowLabelWrap}>
+              <Globe color={Colors.maroon} size={17} />
+              <View>
+                <Text style={styles.rowLabel}>{t("settings.language")}</Text>
+                <Text style={styles.rowSub}>
+                  {LANGUAGE_META.find((l) => l.code === languageCode)?.name ?? "English"}
+                </Text>
+              </View>
+            </View>
+            <ChevronRight color={Colors.textSecondary} size={18} />
+          </TouchableOpacity>
+          <View style={styles.divider} />
           <TouchableOpacity style={styles.row} onPress={onRestore} testID="restore-row">
             <View style={styles.rowLabelWrap}>
               <RefreshCcw color={Colors.blue} size={17} />
-              <Text style={styles.rowLabel}>Restore purchase</Text>
+              <Text style={styles.rowLabel}>{t("settings.restore")}</Text>
             </View>
             <ChevronRight color={Colors.textSecondary} size={18} />
           </TouchableOpacity>
@@ -322,7 +350,7 @@ export default function SettingsScreen() {
           <TouchableOpacity style={styles.row} onPress={goPaywall} testID="manage-sub-row">
             <View style={styles.rowLabelWrap}>
               <Crown color={Colors.gold} size={17} />
-              <Text style={styles.rowLabel}>Manage subscription</Text>
+              <Text style={styles.rowLabel}>{t("paywall.title")}</Text>
             </View>
             <ChevronRight color={Colors.textSecondary} size={18} />
           </TouchableOpacity>
@@ -331,7 +359,7 @@ export default function SettingsScreen() {
             <View style={styles.rowLabelWrap}>
               <Share2 color={Colors.maroon} size={17} />
               <View>
-                <Text style={styles.rowLabel}>Support ID</Text>
+                <Text style={styles.rowLabel}>{t("settings.deviceId")}</Text>
                 <Text style={styles.rowSub}>{license.deviceId}</Text>
               </View>
             </View>
@@ -340,8 +368,8 @@ export default function SettingsScreen() {
         </View>
 
         <Text style={styles.footerNote}>
-          NGUMU: Screen Time Control · Focus better, protect your eyes.{"\n"}
-          Payments are processed securely by RevenueCat via your device&apos;s app store.
+          NGUMU: Screen Time Control · {t("onboarding.welcome.subtitle")}{"\n"}
+          {t("paywall.priceNote")}
         </Text>
       </ScrollView>
     </View>

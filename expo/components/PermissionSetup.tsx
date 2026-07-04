@@ -11,6 +11,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
+import { t } from "@/i18n";
 import type { PermissionState } from "@/types";
 
 const MAROON = "#5A1846";
@@ -66,7 +67,7 @@ function PermissionCard({ icon, title, badge, description, state, onGrant }: Per
                   : styles.badgeTextNeutral,
               ]}
             >
-              {badge === "required" ? "Required" : "Optional"}
+              {badge === "required" ? t("common.required") : t("common.optional")}
             </Text>
           </View>
         </View>
@@ -77,7 +78,7 @@ function PermissionCard({ icon, title, badge, description, state, onGrant }: Per
         {isGranted ? (
           <View style={styles.grantedPill}>
             <Check color="#059669" size={16} />
-            <Text style={styles.grantedPillText}>Granted</Text>
+            <Text style={styles.grantedPillText}>{t("common.granted")}</Text>
           </View>
         ) : (
           <TouchableOpacity
@@ -85,7 +86,7 @@ function PermissionCard({ icon, title, badge, description, state, onGrant }: Per
             onPress={onGrant}
             activeOpacity={0.7}
           >
-            <Text style={styles.grantButtonText}>Grant</Text>
+            <Text style={styles.grantButtonText}>{t("common.grant")}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -139,9 +140,9 @@ export default function PermissionSetup({
           <View style={styles.headerIcon}>
             <ShieldCheck color={MAROON} size={32} strokeWidth={1.5} />
           </View>
-          <Text style={styles.headerTitle}>Setup Permissions</Text>
+          <Text style={styles.headerTitle}>{t("onboarding.permissions.title")}</Text>
           <Text style={styles.headerDesc}>
-            NGUMU needs a few system permissions to effectively monitor your screen time and block distracting apps.
+            {t("onboarding.permissions.subtitle")}
           </Text>
         </View>
 
@@ -151,17 +152,17 @@ export default function PermissionSetup({
             <>
               <PermissionCard
                 icon={<ShieldCheck color={permissions.usageAccess === "granted" ? "#059669" : "#52525B"} size={24} strokeWidth={1.5} />}
-                title="Usage Access"
+                title={t("onboarding.permissions.usageAccess")}
                 badge="required"
-                description="Allows NGUMU to track which apps you are currently using."
+                description={t("onboarding.permissions.usageAccessDesc")}
                 state={permissions.usageAccess}
                 onGrant={onGrantUsageAccess}
               />
               <PermissionCard
                 icon={<Layers color="#52525B" size={24} strokeWidth={1.5} />}
-                title="Display Over Apps"
+                title={t("onboarding.permissions.overlay")}
                 badge="required"
-                description="Needed to show the block screen over distracting applications."
+                description={t("onboarding.permissions.overlayDesc")}
                 state={permissions.overlay}
                 onGrant={onGrantOverlay}
               />
@@ -171,9 +172,9 @@ export default function PermissionSetup({
           {Platform.OS === "ios" && (
             <PermissionCard
               icon={<ShieldCheck color={permissions.usageAccess === "granted" ? "#059669" : "#52525B"} size={24} strokeWidth={1.5} />}
-              title="Screen Time Access"
+              title={t("onboarding.permissions.screenTime")}
               badge="required"
-              description="NGUMU uses Apple's Screen Time APIs to shield distracting apps during focus sessions."
+              description={t("onboarding.permissions.screenTimeDesc")}
               state={permissions.usageAccess}
               onGrant={onGrantUsageAccess}
             />
@@ -181,9 +182,9 @@ export default function PermissionSetup({
 
           <PermissionCard
             icon={<Bell color="#52525B" size={24} strokeWidth={1.5} />}
-            title="Notifications"
+            title={t("onboarding.permissions.notifications")}
             badge="optional"
-            description="Get alerts when your screen time limit is approaching."
+            description={t("onboarding.permissions.notificationsDesc")}
             state={permissions.notifications}
             onGrant={onGrantNotifications}
           />
@@ -192,7 +193,7 @@ export default function PermissionSetup({
         {Platform.OS === "ios" && (
           <View style={styles.iosNote}>
             <Text style={styles.iosNoteText}>
-              iOS uses Apple-approved Screen Time APIs (FamilyControls). System-level app blocking requires iOS 16+ and your permission. Some features may be limited by iOS restrictions.
+              {t("onboarding.permissions.iosNote")}
             </Text>
           </View>
         )}
@@ -201,7 +202,7 @@ export default function PermissionSetup({
       {/* Sticky bottom bar */}
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 20 }]}>
         <Text style={styles.bottomBarCount}>
-          {requiredGranted} of {requiredTotal} required permissions granted
+          {t("onboarding.permissions.progress", { count: requiredGranted, total: requiredTotal })}
         </Text>
         <TouchableOpacity
           style={[styles.continueButton, canContinue ? styles.continueButtonActive : styles.continueButtonDisabled]}
@@ -210,13 +211,13 @@ export default function PermissionSetup({
           activeOpacity={0.85}
         >
           <Text style={styles.continueButtonText}>
-            {canContinue ? "Continue" : "Grant required permissions"}
+            {canContinue ? t("onboarding.permissions.continue") : t("onboarding.permissions.grantRequired")}
           </Text>
           {canContinue && <ArrowRight color="#FFFFFF" size={20} />}
         </TouchableOpacity>
         {!canContinue && onSkip && (
           <TouchableOpacity onPress={onSkip} style={styles.skipRow} hitSlop={8}>
-            <Text style={styles.skipText}>Skip for now</Text>
+            <Text style={styles.skipText}>{t("onboarding.permissions.skipForNow")}</Text>
           </TouchableOpacity>
         )}
       </View>
