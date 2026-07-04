@@ -16,7 +16,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   strictBreaks: false,
   notificationsEnabled: true,
   dailyReminderEnabled: false,
-  customFocusMin: 25,
+  customFocusMin: 45,
   customBreakMin: 10,
   dailyGoalMin: 120,
   customEyeHealth: false,

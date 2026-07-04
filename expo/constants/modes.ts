@@ -46,7 +46,7 @@ export const MODES: FocusModeDef[] = [
     id: "custom",
     name: "Custom",
     tagline: "Your own focus & break lengths",
-    focusSec: 25 * 60,
+    focusSec: 45 * 60,
     breakSec: 10 * 60,
     pro: true,
     accent: Colors.maroonLight,

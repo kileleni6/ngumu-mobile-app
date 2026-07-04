@@ -27,7 +27,6 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
-import { t } from "@/i18n";
 import { useLicense } from "@/providers/LicenseProvider";
 import {
   fetchOfferings,
@@ -36,59 +35,31 @@ import {
 } from "@/services/revenuecat";
 import { getJSON, setJSON } from "@/services/storage";
 
-const FEATURES: { icon: React.ReactNode; labelKey: string }[] = [
-  { icon: <ShieldBan color={Colors.gold} size={18} />, labelKey: "paywall.features.blocking" },
-  { icon: <Timer color={Colors.gold} size={18} />, labelKey: "paywall.features.custom" },
-  { icon: <Lock color={Colors.gold} size={18} />, labelKey: "paywall.features.strict" },
-  { icon: <Eye color={Colors.gold} size={18} />, labelKey: "paywall.features.blink" },
-  { icon: <BarChart3 color={Colors.gold} size={18} />, labelKey: "paywall.features.analytics" },
-  { icon: <RefreshCcw color={Colors.gold} size={18} />, labelKey: "paywall.features.restore" },
+const FEATURES: { icon: React.ReactNode; label: string }[] = [
+  { icon: <ShieldBan color={Colors.gold} size={18} />, label: "App & website blocking during focus" },
+  { icon: <Timer color={Colors.gold} size={18} />, label: "Custom focus & break modes" },
+  { icon: <Lock color={Colors.gold} size={18} />, label: "Strict break mode" },
+  { icon: <Eye color={Colors.gold} size={18} />, label: "Blink warning customization" },
+  { icon: <BarChart3 color={Colors.gold} size={18} />, label: "Advanced analytics & CSV export" },
+  { icon: <RefreshCcw color={Colors.gold} size={18} />, label: "Multi-device restore" },
 ];
 
-/** Maps RevenueCat package types to display metadata and fixed USD prices. */
-function packageMeta(pkg: RCPackageInfo): {
-  name: string;
-  badge?: string;
-  detail: string;
-  priceString: string;
-} {
+/** Maps RevenueCat package types to display metadata. */
+function packageMeta(pkg: RCPackageInfo): { name: string; badge?: string; detail: string } {
   const type = pkg.packageType;
   if (type.includes("WEEKLY")) {
-    return {
-      name: t("paywall.weekly"),
-      detail: t("paywall.weeklyDetail"),
-      priceString: "$2.99",
-    };
+    return { name: "Weekly", detail: "Flexible — cancel anytime" };
   }
   if (type.includes("MONTHLY")) {
-    return {
-      name: t("paywall.monthly") ?? "Monthly",
-      detail: t("paywall.monthlyDetail") ?? "Flexible month-to-month",
-      badge: t("paywall.monthlyBadge") ?? "POPULAR",
-      priceString: "$4.99",
-    };
+    return { name: "Monthly", detail: "Most popular balance", badge: "POPULAR" };
   }
   if (type.includes("ANNUAL") || type.includes("YEARLY")) {
-    return {
-      name: t("paywall.yearly"),
-      detail: t("paywall.yearlyDetail"),
-      badge: t("paywall.yearlyBadge"),
-      priceString: "$29.99",
-    };
+    return { name: "Yearly", detail: "Best yearly value" };
   }
   if (type.includes("LIFETIME")) {
-    return {
-      name: t("paywall.lifetime"),
-      detail: t("paywall.lifetimeDetail"),
-      badge: t("paywall.lifetimeBadge"),
-      priceString: "$249.99",
-    };
+    return { name: "Lifetime", detail: "Pay once, own it forever", badge: "BEST VALUE" };
   }
-  return {
-    name: pkg.product.title || pkg.identifier,
-    detail: pkg.product.description,
-    priceString: pkg.priceString || "",
-  };
+  return { name: pkg.product.title || pkg.identifier, detail: pkg.product.description };
 }
 
 const ONBOARDING_KEY = "ngumu.onboarding.v1";
@@ -121,13 +92,19 @@ export default function PaywallScreen() {
         // user dismissed the native sheet — no action needed
       } else if (result.hasPro) {
         await license.onPurchaseSuccess();
-        Alert.alert(t("paywall.restored"), t("paywall.welcome"));
+        Alert.alert("Pro activated", "Welcome to NGUMU Pro. Enjoy your focus!");
         router.back();
       } else {
-        Alert.alert(t("paywall.almostThere"), t("paywall.almostThereBody"));
+        Alert.alert(
+          "Almost there",
+          "Payment received but entitlement is still syncing. Try Restore in a moment."
+        );
       }
     } catch {
-      Alert.alert(t("paywall.purchaseUnavailable"), t("paywall.purchaseUnavailableBody"));
+      Alert.alert(
+        "Purchase unavailable",
+        "Check your connection and try again. If the problem persists, contact support."
+      );
     } finally {
       setBusy(null);
     }
@@ -138,13 +115,13 @@ export default function PaywallScreen() {
     try {
       const ok = await license.restorePurchase();
       if (ok) {
-        Alert.alert(t("paywall.restored"), t("paywall.restoredBody"));
+        Alert.alert("Restored", "Your NGUMU Pro license is active on this device.");
         router.back();
       } else {
-        Alert.alert(t("paywall.noPurchases"), t("paywall.noPurchasesBody"));
+        Alert.alert("No purchases found", "No active NGUMU Pro purchases were found for this account.");
       }
     } catch {
-      Alert.alert(t("paywall.restoreFailed"), t("paywall.restoreFailedBody"));
+      Alert.alert("Restore failed", "Check your connection and try again.");
     } finally {
       setBusy(null);
     }
@@ -155,9 +132,9 @@ export default function PaywallScreen() {
       router.back();
     } else {
       Alert.alert(
-        t("paywall.trialExpired"),
-        t("paywall.trialExpiredBody"),
-        [{ text: t("paywall.viewPlans"), style: "default" }]
+        "Trial expired",
+        "Your 40-day trial has ended. The basic timer remains free, but Pro features require a subscription.",
+        [{ text: "View plans", style: "default" }]
       );
     }
   };
@@ -186,18 +163,18 @@ export default function PaywallScreen() {
             <View style={styles.crownWrap}>
               <Crown color={Colors.gold} size={34} />
             </View>
-            <Text style={styles.heroTitle}>{t("paywall.title")}</Text>
+            <Text style={styles.heroTitle}>NGUMU Pro</Text>
             <Text style={styles.heroSub}>
               {license.tier === "trial"
-                ? t("paywall.trialLeft", { count: license.trialDaysLeft })
+                ? `You have ${license.trialDaysLeft} trial days of full Pro access left`
                 : license.tier === "pro"
-                  ? t("paywall.active")
-                  : t("paywall.trialExpired")}
+                  ? "Pro is active on this device"
+                  : "Your 40-day trial has ended — the basic timer stays free forever"}
             </Text>
             {isHardPaywall && (
               <View style={styles.hardPaywallBadge}>
                 <Lock color={Colors.gold} size={14} />
-                <Text style={styles.hardPaywallText}>{t("paywall.hardPaywall")}</Text>
+                <Text style={styles.hardPaywallText}>Trial expired — unlock Pro to continue</Text>
               </View>
             )}
           </LinearGradient>
@@ -205,36 +182,42 @@ export default function PaywallScreen() {
           <View style={styles.body}>
             <View style={styles.features}>
               {FEATURES.map((f) => (
-                <View key={f.labelKey} style={styles.featureRow}>
+                <View key={f.label} style={styles.featureRow}>
                   {f.icon}
-                  <Text style={styles.featureText}>{t(f.labelKey)}</Text>
+                  <Text style={styles.featureText}>{f.label}</Text>
                 </View>
               ))}
             </View>
 
             {license.tier !== "pro" && (
               <>
-                <Text style={styles.sectionTitle}>{t("paywall.choosePlan")}</Text>
+                <Text style={styles.sectionTitle}>Choose a plan</Text>
                 {isLoading && (
                   <View style={styles.loadingRow}>
                     <ActivityIndicator color={Colors.maroon} size="large" />
-                    <Text style={styles.loadingText}>{t("paywall.loading")}</Text>
+                    <Text style={styles.loadingText}>Loading plans...</Text>
                   </View>
                 )}
                 {isError && !isLoading && (
                   <View style={styles.errorCard}>
-                    <Text style={styles.errorText}>{t("paywall.error")}</Text>
+                    <Text style={styles.errorText}>
+                      Could not load plans. Check your connection and pull down to retry, or tap
+                      Restore if you already purchased.
+                    </Text>
                     <TouchableOpacity
                       style={styles.retryButton}
                       onPress={() => offeringsQuery.refetch()}
                     >
-                      <Text style={styles.retryText}>{t("common.retry") ?? "Retry"}</Text>
+                      <Text style={styles.retryText}>Retry</Text>
                     </TouchableOpacity>
                   </View>
                 )}
                 {!isLoading && !isError && packages.length === 0 && (
                   <View style={styles.errorCard}>
-                    <Text style={styles.errorText}>{t("paywall.noPlans")}</Text>
+                    <Text style={styles.errorText}>
+                      No plans available right now. Tap Restore if you already purchased, or try
+                      again later.
+                    </Text>
                   </View>
                 )}
                 {!isLoading && packages.length > 0 && (
@@ -262,9 +245,9 @@ export default function PaywallScreen() {
                             <Text style={styles.planDetail}>{meta.detail}</Text>
                           </View>
                           <View style={styles.planRightCol}>
-                            {meta.priceString ? (
+                            {pkg.priceString ? (
                               <Text style={[styles.planPrice, selected && styles.planPriceSelected]}>
-                                {meta.priceString}
+                                {pkg.priceString}
                               </Text>
                             ) : null}
                             <CheckCircle2
@@ -277,11 +260,17 @@ export default function PaywallScreen() {
                     })}
                   </View>
                 )}
-                <Text style={styles.priceNote}>{t("paywall.priceNote")}</Text>
+                <Text style={styles.priceNote}>
+                  Subscription auto-renews unless cancelled at least 24 hours before the period ends.
+                  Manage in your device&apos;s store settings.
+                </Text>
 
                 {!license.revenueCatConfigured && (
                   <View style={styles.warnCard}>
-                    <Text style={styles.warnText}>{t("paywall.notConfigured")}</Text>
+                    <Text style={styles.warnText}>
+                      Payments are not fully configured yet. Restore may still work if you have a
+                      previous purchase.
+                    </Text>
                   </View>
                 )}
 
@@ -295,7 +284,7 @@ export default function PaywallScreen() {
                     <ActivityIndicator color={Colors.maroonDeep} />
                   ) : (
                     <Text style={styles.ctaText}>
-                      {isHardPaywall ? t("paywall.cta") : t("paywall.continue")}
+                      {isHardPaywall ? "Subscribe to unlock" : "Continue"}
                     </Text>
                   )}
                 </TouchableOpacity>
@@ -309,7 +298,7 @@ export default function PaywallScreen() {
                   {busy === "restore" ? (
                     <ActivityIndicator color={Colors.textSecondary} size="small" />
                   ) : (
-                    <Text style={styles.restoreText}>{t("paywall.restore")}</Text>
+                    <Text style={styles.restoreText}>Restore purchases</Text>
                   )}
                 </TouchableOpacity>
               </>
@@ -319,11 +308,9 @@ export default function PaywallScreen() {
               <View style={styles.proCard}>
                 <CheckCircle2 color={Colors.success} size={22} />
                 <Text style={styles.proCardText}>
-                  {t("paywall.proCard", {
-                    detail: license.license.expirationDate
-                      ? `${t("paywall.renews") ?? "renews"} ${new Date(license.license.expirationDate).toLocaleDateString()}`
-                      : t("paywall.lifetime") ?? "lifetime",
-                  })}
+                  Pro active{license.license.expirationDate
+                    ? ` · renews ${new Date(license.license.expirationDate).toLocaleDateString()}`
+                    : " · lifetime"}
                 </Text>
               </View>
             )}

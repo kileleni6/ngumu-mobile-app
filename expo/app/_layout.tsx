@@ -6,7 +6,6 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { AnalyticsProvider } from "@/providers/AnalyticsProvider";
 import { BlockingProvider } from "@/providers/BlockingProvider";
-import { LanguageProvider } from "@/providers/LanguageProvider";
 import { LicenseProvider } from "@/providers/LicenseProvider";
 import { OnboardingProvider, useOnboarding } from "@/providers/OnboardingProvider";
 import { SettingsProvider } from "@/providers/SettingsProvider";
@@ -75,21 +74,19 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <GestureHandlerRootView>
-        <LanguageProvider>
-          <SettingsProvider>
-            <LicenseProvider>
-              <AnalyticsProvider>
-                <BlockingProvider>
-                  <TimerProvider>
-                    <OnboardingProvider>
-                      <RootLayoutNav />
-                    </OnboardingProvider>
-                  </TimerProvider>
-                </BlockingProvider>
-              </AnalyticsProvider>
-            </LicenseProvider>
-          </SettingsProvider>
-        </LanguageProvider>
+        <SettingsProvider>
+          <LicenseProvider>
+            <AnalyticsProvider>
+              <BlockingProvider>
+                <TimerProvider>
+                  <OnboardingProvider>
+                    <RootLayoutNav />
+                  </OnboardingProvider>
+                </TimerProvider>
+              </BlockingProvider>
+            </AnalyticsProvider>
+          </LicenseProvider>
+        </SettingsProvider>
       </GestureHandlerRootView>
     </QueryClientProvider>
   );
