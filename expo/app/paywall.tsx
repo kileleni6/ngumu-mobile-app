@@ -29,6 +29,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useLicense } from "@/providers/LicenseProvider";
 import {
+  PURCHASES_SUPPORTED,
   fetchOfferings,
   purchasePackage,
   type RCPackageInfo,
@@ -75,6 +76,7 @@ export default function PaywallScreen() {
     queryKey: ["rc-offerings"],
     queryFn: fetchOfferings,
     staleTime: 5 * 60 * 1000,
+    enabled: PURCHASES_SUPPORTED,
   });
 
   const packages: RCPackageInfo[] = offeringsQuery.data?.current ?? [];
@@ -192,13 +194,21 @@ export default function PaywallScreen() {
             {license.tier !== "pro" && (
               <>
                 <Text style={styles.sectionTitle}>Choose a plan</Text>
-                {isLoading && (
+                {!PURCHASES_SUPPORTED && (
+                  <View style={styles.errorCard}>
+                    <Text style={styles.errorText}>
+                      In-app purchases are available in the NGUMU iOS and Android apps. Open NGUMU
+                      on your phone to subscribe — your Pro access syncs automatically.
+                    </Text>
+                  </View>
+                )}
+                {PURCHASES_SUPPORTED && isLoading && (
                   <View style={styles.loadingRow}>
                     <ActivityIndicator color={Colors.maroon} size="large" />
                     <Text style={styles.loadingText}>Loading plans...</Text>
                   </View>
                 )}
-                {isError && !isLoading && (
+                {PURCHASES_SUPPORTED && isError && !isLoading && (
                   <View style={styles.errorCard}>
                     <Text style={styles.errorText}>
                       Could not load plans. Check your connection and pull down to retry, or tap
@@ -212,7 +222,7 @@ export default function PaywallScreen() {
                     </TouchableOpacity>
                   </View>
                 )}
-                {!isLoading && !isError && packages.length === 0 && (
+                {PURCHASES_SUPPORTED && !isLoading && !isError && packages.length === 0 && (
                   <View style={styles.errorCard}>
                     <Text style={styles.errorText}>
                       No plans available right now. Tap Restore if you already purchased, or try
@@ -220,7 +230,7 @@ export default function PaywallScreen() {
                     </Text>
                   </View>
                 )}
-                {!isLoading && packages.length > 0 && (
+                {!PURCHASES_SUPPORTED || isLoading || isError || packages.length === 0 ? null : (
                   <View style={styles.plans}>
                     {packages.map((pkg, idx) => {
                       const meta = packageMeta(pkg);
@@ -265,7 +275,7 @@ export default function PaywallScreen() {
                   Manage in your device&apos;s store settings.
                 </Text>
 
-                {!license.revenueCatConfigured && (
+                {PURCHASES_SUPPORTED && !license.revenueCatConfigured && (
                   <View style={styles.warnCard}>
                     <Text style={styles.warnText}>
                       Payments are not fully configured yet. Restore may still work if you have a
@@ -274,33 +284,37 @@ export default function PaywallScreen() {
                   </View>
                 )}
 
-                <TouchableOpacity
-                  style={[styles.ctaButton, busy !== null && styles.ctaDisabled, packages.length === 0 && styles.ctaDisabled]}
-                  onPress={onPurchase}
-                  disabled={busy !== null || packages.length === 0}
-                  testID="checkout-button"
-                >
-                  {busy === "purchase" ? (
-                    <ActivityIndicator color={Colors.maroonDeep} />
-                  ) : (
-                    <Text style={styles.ctaText}>
-                      {isHardPaywall ? "Subscribe to unlock" : "Continue"}
-                    </Text>
-                  )}
-                </TouchableOpacity>
+                {!PURCHASES_SUPPORTED ? null : (
+                  <TouchableOpacity
+                    style={[styles.ctaButton, busy !== null && styles.ctaDisabled, packages.length === 0 && styles.ctaDisabled]}
+                    onPress={onPurchase}
+                    disabled={busy !== null || packages.length === 0}
+                    testID="checkout-button"
+                  >
+                    {busy === "purchase" ? (
+                      <ActivityIndicator color={Colors.maroonDeep} />
+                    ) : (
+                      <Text style={styles.ctaText}>
+                        {isHardPaywall ? "Subscribe to unlock" : "Continue"}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                )}
 
-                <TouchableOpacity
-                  style={[styles.restoreLink, busy !== null && styles.ctaDisabled]}
-                  onPress={onRestore}
-                  disabled={busy !== null}
-                  testID="restore-button"
-                >
-                  {busy === "restore" ? (
-                    <ActivityIndicator color={Colors.textSecondary} size="small" />
-                  ) : (
-                    <Text style={styles.restoreText}>Restore purchases</Text>
-                  )}
-                </TouchableOpacity>
+                {!PURCHASES_SUPPORTED ? null : (
+                  <TouchableOpacity
+                    style={[styles.restoreLink, busy !== null && styles.ctaDisabled]}
+                    onPress={onRestore}
+                    disabled={busy !== null}
+                    testID="restore-button"
+                  >
+                    {busy === "restore" ? (
+                      <ActivityIndicator color={Colors.textSecondary} size="small" />
+                    ) : (
+                      <Text style={styles.restoreText}>Restore purchases</Text>
+                    )}
+                  </TouchableOpacity>
+                )}
               </>
             )}
 

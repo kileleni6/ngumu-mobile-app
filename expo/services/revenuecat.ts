@@ -11,11 +11,15 @@ import Purchases from "react-native-purchases";
 
 const ENTITLEMENT_ID = "NGUMU Pro";
 
+/** In-app purchases only work in native builds — the web preview has no store billing. */
+export const PURCHASES_SUPPORTED = Platform.OS !== "web";
+
 let configured = false;
 
 /** Picks the correct RevenueCat public API key for the current platform/build. */
 export function getRCApiKey(): string {
-  if (__DEV__ || Platform.OS === "web") {
+  if (Platform.OS === "web") return "";
+  if (__DEV__) {
     return process.env.EXPO_PUBLIC_REVENUECAT_TEST_API_KEY ?? "";
   }
   return Platform.select({
@@ -27,7 +31,7 @@ export function getRCApiKey(): string {
 
 /** Returns true if RevenueCat API keys are configured in environment variables. */
 export function isRevenueCatConfigured(): boolean {
-  return getRCApiKey().length > 0;
+  return PURCHASES_SUPPORTED && getRCApiKey().length > 0;
 }
 
 /**
@@ -36,6 +40,10 @@ export function isRevenueCatConfigured(): boolean {
  */
 export async function configureRevenueCat(appUserId?: string): Promise<void> {
   if (configured) return;
+  // Skip entirely on web: the RC web SDK posts telemetry to api.revenuecat.com
+  // on configure, and when those fetches fail (offline/blocked) it surfaces
+  // unhandled "Failed to fetch" rejections. Web has no store billing anyway.
+  if (!PURCHASES_SUPPORTED) return;
   const apiKey = getRCApiKey();
   if (!apiKey) {
     console.log("[revenuecat] No API key found — skipping configuration");
@@ -71,6 +79,7 @@ export interface RCOfferingsResult {
 
 /** Fetches the current offering's packages, or null if none available. */
 export async function fetchOfferings(): Promise<RCOfferingsResult> {
+  if (!PURCHASES_SUPPORTED) return { current: null, all: {} };
   if (!configured) await configureRevenueCat();
   try {
     const offerings = await Purchases.getOfferings();
@@ -110,6 +119,9 @@ export interface RCCustomerInfoResult {
 
 /** Checks the current customer's entitlement status. */
 export async function getCustomerInfo(): Promise<RCCustomerInfoResult> {
+  if (!PURCHASES_SUPPORTED) {
+    return { hasPro: false, entitlementId: null, expirationDate: null, activeSubscriptions: [] };
+  }
   if (!configured) await configureRevenueCat();
   try {
     const info = await Purchases.getCustomerInfo();
@@ -139,6 +151,9 @@ export interface PurchaseResult {
 
 /** Initiates a purchase for a specific package. Handles cancel/error gracefully. */
 export async function purchasePackage(pkgRaw: unknown): Promise<PurchaseResult> {
+  if (!PURCHASES_SUPPORTED) {
+    return { success: false, cancelled: false, hasPro: false };
+  }
   if (!configured) await configureRevenueCat();
   try {
     const { customerInfo } = await Purchases.purchasePackage(pkgRaw as any);
@@ -155,6 +170,9 @@ export async function purchasePackage(pkgRaw: unknown): Promise<PurchaseResult> 
 
 /** Restores previous purchases — required by App Store review. */
 export async function restorePurchases(): Promise<RCCustomerInfoResult> {
+  if (!PURCHASES_SUPPORTED) {
+    return { hasPro: false, entitlementId: null, expirationDate: null, activeSubscriptions: [] };
+  }
   if (!configured) await configureRevenueCat();
   try {
     const info = await Purchases.restorePurchases();
